@@ -1,0 +1,7 @@
+{
+	"Author": "VariableVixen",
+	"Name": "AutoMountBgm",
+	"Description": "Some mounts have really cool BGM tracks (Cruise Chaser FTW) while others are almost sickening in how much you hear them. It's annoying to keep needing to use /mountbgm, but now you won't have to - just let the plugin do it for you!",
+	"RepoUrl": "https://github.com/PrincessRTFM/AutoMountBGM",
+	"Punchline": "Automatically control mount BGM for individual mounts!"
+}
