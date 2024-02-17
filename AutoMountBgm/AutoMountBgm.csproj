@@ -2,7 +2,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 	<PropertyGroup>
 		<Product>AutoMountBGM</Product>
-		<Version>2.0.0</Version>
+		<Version>2.0.1</Version>
 		<Description>Automatically enables/disables mount BGM depending on the mount you use</Description>
 		<Copyright>Copyleft VariableVixen 2023</Copyright>
 	</PropertyGroup>

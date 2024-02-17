@@ -57,11 +57,11 @@ public class Plugin: IDalamudPlugin {
 	private void onConditionChanged(ConditionFlag flag, bool value) {
 		if (flag is not (ConditionFlag.Mounted or ConditionFlag.Mounted2))
 			return;
-		if (!value)
-			return;
 		ushort mount = this.mountId;
-		if (mount is 0)
+		if (!value || mount is 0) { // disable mount bgm when unmounting to prevent volume stutters when using a disabled mount
+			GameConfig.Set(SystemConfigOption.SoundChocobo, false);
 			return;
+		}
 
 		if (Config.BgmDisabledMounts.Contains(mount))
 			GameConfig.Set(SystemConfigOption.SoundChocobo, false);
