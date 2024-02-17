@@ -1,9 +1,8 @@
-namespace PrincessRTFM.AutoMountBGM;
-
 using System.Collections.Generic;
-using System.Linq;
 
 using Dalamud.Configuration;
+
+namespace PrincessRTFM.AutoMountBGM;
 
 public class Configuration: IPluginConfiguration {
 	public int Version { get; set; } = 1;
