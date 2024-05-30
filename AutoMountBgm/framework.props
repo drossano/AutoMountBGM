@@ -53,7 +53,7 @@
 		<NullableContextOptions>enable</NullableContextOptions>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 		<CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>
-		<LangVersion>11</LangVersion>
+		<LangVersion>12</LangVersion>
 		<AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
 		<OutputPath>bin\$(Configuration)\</OutputPath>
 		<RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
