@@ -1,19 +1,29 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 
 using Dalamud.Game.ClientState.Conditions;
 using Dalamud.Game.ClientState.Objects.Types;
 using Dalamud.Game.Config;
+using Dalamud.Interface.Windowing;
 using Dalamud.IoC;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
 
+using Lumina.Excel.GeneratedSheets;
+
 using Character = FFXIVClientStructs.FFXIV.Client.Game.Character.Character;
+
+using PlayerState = FFXIVClientStructs.FFXIV.Client.Game.UI.PlayerState;
 
 namespace PrincessRTFM.AutoMountBGM;
 
 public class Plugin: IDalamudPlugin {
-	public string Name { get; } = "AutoMountBGM";
-	public string Command => $"/{this.Name.ToLower()}";
+	public const ushort BgmIdBorderless = 319;
+
+	public const string Name = "AutoMountBGM";
+	public static string Command => $"/{Name.ToLower()}";
 
 	[PluginService] public static DalamudPluginInterface Interface { get; private set; } = null!;
 	[PluginService] public static IClientState ClientState { get; private set; } = null!;
@@ -21,22 +31,78 @@ public class Plugin: IDalamudPlugin {
 	[PluginService] public static IChatGui ChatGui { get; private set; } = null!;
 	[PluginService] public static ICondition Condition { get; private set; } = null!;
 	[PluginService] public static IGameConfig GameConfig { get; private set; } = null!;
+	[PluginService] public static IDataManager GameData { get; private set; } = null!;
+	[PluginService] public static IPluginLog Log { get; private set; } = null!;
 	public static Configuration Config { get; private set; } = null!;
+
+	public static WindowSystem Windows { get; private set; } = null!;
+	internal static Window ConfigWindow { get; private set; } = null!;
+
+	private static readonly Dictionary<ushort, string> bgmNames = [];
+	private static readonly Dictionary<ushort, MountData> mountData = [];
+	private static MountData[] alphabetisedMountData = [];
+
+	internal static MountData[] AlphabetisedMounts => Initialised ? alphabetisedMountData : [];
+
+	public static bool Initialised => initialiserThread?.IsCompletedSuccessfully ?? false;
+	private static Task initialiserThread = null!;
 
 	public Plugin() {
 		Config = Interface.GetPluginConfig() as Configuration ?? new();
-		CommandManager.AddHandler(this.Command, new(this.onCommand) {
-			HelpMessage = "[on|off] - check, enable, or disable automatic mount BGM activation for your current mount",
+		initialiserThread ??= Task.Run(parallelInit);
+		CommandManager.AddHandler(Command, new(this.onCommand) {
+			HelpMessage = "[on|off] - check, enable, or disable automatic mount BGM activation for your current mount"
+				+ $"\n{Command} open - open the mount BGM control window",
 			ShowInHelp = true,
 		});
 		Condition.ConditionChange += this.onConditionChanged;
-		//GameConfig.Changed += this.watchGameConfig;
+		Windows = new(Name);
+		ConfigWindow = new ConfigWindow(Name);
+		Windows.AddWindow(ConfigWindow);
+		Interface.UiBuilder.OpenMainUi += ToggleUi;
+		Interface.UiBuilder.OpenConfigUi += ToggleUi;
+		Interface.UiBuilder.Draw += Windows.Draw;
 	}
 
-	private void watchGameConfig(object? sender, ConfigChangeEvent evt) {
-		string group = evt.Option.GetType().Name;
-		string option = evt.Option.ToString();
-		ChatGui.Print($"Option changed: {group}.{option}");
+	private static void parallelInit() {
+		Log.Info("Caching BGM track names...");
+		foreach (BGM bgm in GameData.GetExcelSheet<BGM>()!) {
+			bgmNames[(ushort)bgm.RowId] = bgm.File.RawString.Replace("music/", "").Replace("ffxiv/", "");
+		}
+		Log.Info("Caching mount data...");
+		foreach (Mount mount in GameData.GetExcelSheet<Mount>()!) {
+			string name = mount.Singular;
+			ushort id = (ushort)mount.RowId;
+			if (!string.IsNullOrWhiteSpace(name))
+				mountData[id] = new MountData(id, name, (ushort)mount.RideBGM.Row);
+		}
+		Log.Info("Alphabetising mount list...");
+		alphabetisedMountData = mountData
+			.OrderBy(p => p.Value.Name, StringComparer.OrdinalIgnoreCase)
+			.Select(p => p.Value)
+			.ToArray();
+		Log.Info("Parallel initialisation complete - plugin ready!");
+	}
+
+	public static void ToggleUi() {
+		if (!Initialised) {
+			Log.Warning("Parallel initialisation thread has not yet completed! Window will NOT draw!");
+		}
+		Log.Info($"{(ConfigWindow.IsOpen ? "Clos" : "Open")}ing mount BGM control window");
+		ConfigWindow.Toggle();
+	}
+
+	public static string? GetMountName(ushort mountId) => mountData.TryGetValue(mountId, out MountData? mount) ? mount.Name : null;
+	public static string GetBgmName(ushort trackId) => bgmNames.TryGetValue(trackId, out string? name)
+		? name
+		: "[N/A]";
+	public static unsafe bool CheckMountUnlocked(ushort mountId) {
+		if (!ClientState.IsLoggedIn)
+			return true; // if you're not logged in, this condition/check is meaningless
+		PlayerState* ps = PlayerState.Instance();
+		if (ps is null)
+			return true; // likewise, just in case
+		return ps->IsMountUnlocked(mountId);
 	}
 
 	private unsafe ushort mountId {
@@ -63,16 +129,22 @@ public class Plugin: IDalamudPlugin {
 			return;
 		}
 
-		if (Config.BgmDisabledMounts.Contains(mount))
+		if ((Config.DisableBorderlessBgm && mountData[mount].BgmId == BgmIdBorderless) || Config.BgmDisabledMounts.Contains(mount))
 			GameConfig.Set(SystemConfigOption.SoundChocobo, false);
 		else
 			GameConfig.Set(SystemConfigOption.SoundChocobo, true);
 	}
 
 	private void onCommand(string command, string args) {
+		if (!Initialised) {
+			Log.Warning("Parallel initialisation thread has not yet completed!");
+			ChatGui.PrintError($"{Name} is still initialising, please wait.");
+			return;
+		}
 		ushort mount = this.mountId;
 		if (mount is 0) {
 			ChatGui.PrintError("You are not currently mounted.");
+			ChatGui.Print($"Use '{Command} open' to open the mount BGM configuration window.");
 			return;
 		}
 		string[] argv = args.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
@@ -81,19 +153,22 @@ public class Plugin: IDalamudPlugin {
 		switch (subcmd) {
 			case "":
 				if (Config.BgmDisabledMounts.Contains(mount))
-					ChatGui.Print("This mount auto-disables BGM when used.");
+					ChatGui.Print($"{GetMountName(mount)} auto-disables BGM when used.");
 				else
-					ChatGui.Print("This mount auto-enables BGM when used.");
+					ChatGui.Print($"{GetMountName(mount)} auto-enables BGM when used.");
 				break;
 			case "on":
 				Config.BgmDisabledMounts.Remove(mount);
-				ChatGui.Print("This mount will now enable mount BGM when used.");
+				ChatGui.Print($"{GetMountName(mount)} will now enable mount BGM when used.");
 				this.onConditionChanged(ConditionFlag.Mounted, true);
 				break;
 			case "off":
 				Config.BgmDisabledMounts.Add(mount);
-				ChatGui.Print("This mount will now disable mount BGM when used.");
+				ChatGui.Print($"{GetMountName(mount)} will now disable mount BGM when used.");
 				this.onConditionChanged(ConditionFlag.Mounted, true);
+				break;
+			case "open":
+				ToggleUi();
 				break;
 			default:
 				ChatGui.PrintError("Unknown subcommand: " + subcmd);
@@ -111,9 +186,14 @@ public class Plugin: IDalamudPlugin {
 
 		if (disposing) {
 			Condition.ConditionChange -= this.onConditionChanged;
-			CommandManager.RemoveHandler(this.Command);
-			GameConfig.Changed -= this.watchGameConfig;
+			CommandManager.RemoveHandler(Command);
+			Interface.UiBuilder.OpenMainUi -= ToggleUi;
+			Interface.UiBuilder.OpenConfigUi -= ToggleUi;
+			Interface.UiBuilder.Draw -= Windows.Draw;
 		}
+
+		alphabetisedMountData = [];
+		mountData.Clear();
 	}
 	public void Dispose() {
 		this.Dispose(true);
