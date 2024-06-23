@@ -1,4 +1,6 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
+using System.Linq;
 using System.Numerics;
 
 using Dalamud.Interface.Windowing;
@@ -25,13 +27,14 @@ public class ConfigWindow: Window {
 
 	private bool playerLoggedIn = false;
 	private bool filterOnlyUnlocked = false;
-	private string searchText = string.Empty;
+	private string searchTextMountName = string.Empty;
+	private string searchTextBgmFilename = string.Empty;
 
 	public ConfigWindow(string name) : base(name, FLAGS, false) {
 		this.AllowClickthrough = false;
 		this.AllowPinning = true;
 		this.SizeConstraints = new WindowSizeConstraints() {
-			MinimumSize = new Vector2(500, 400),
+			MinimumSize = new Vector2(600, 400),
 			MaximumSize = new Vector2(600, 800),
 		};
 		this.Size = new(
@@ -47,7 +50,9 @@ public class ConfigWindow: Window {
 	public override void OnOpen() {
 		base.OnOpen();
 		this.Collapsed = false;
-		this.searchText = string.Empty;
+		this.CollapsedCondition = ImGuiCond.Appearing;
+		this.searchTextMountName = string.Empty;
+		this.searchTextBgmFilename = string.Empty;
 	}
 
 	public override bool DrawConditions() => Plugin.Initialised;
@@ -59,7 +64,7 @@ public class ConfigWindow: Window {
 	}
 
 	public override void Draw() {
-		drawMassControlButtons();
+		this.drawMassControlButtons();
 
 		Vector2 room = ImGui.GetContentRegionAvail();
 		ImGuiStylePtr style = ImGui.GetStyle();
@@ -88,40 +93,35 @@ public class ConfigWindow: Window {
 		ImGui.TextUnformatted("The best I can do is the internal BGM track filename.");
 	}
 
-	private static void drawMassControlButtons() {
+	private void drawMassControlButtons() {
 		ImGuiStylePtr style = ImGui.GetStyle();
 		bool modeEnable = ImGui.IsKeyDown(ImGuiKey.ModCtrl); // control -> turn ON, else -> turn OFF
-		string btnAll = $"{LblSet} All {(modeEnable ? LblOn : LblOff)}";
-		string btnBad = $"{LblSet} \"Borderless\" {(modeEnable ? LblOn : LblOff)}";
 		string tip = modeEnable ? $"Release CONTROL to {LblSet.ToLower()} {LblOff.ToUpper()}." : $"Hold CONTROL to {LblSet.ToLower()} {LblOn.ToUpper()}.";
+		string btnAll = $"{LblSet} All {(modeEnable ? LblOn : LblOff)}";
+		string btnFiltered = $"{LblSet} Visible {(modeEnable ? LblOn : LblOff)}";
 		float wAll = ImGui.CalcTextSize(btnAll).X;
-		float wBorderless = ImGui.CalcTextSize(btnBad).X;
+		float wFiltered = ImGui.CalcTextSize(btnFiltered).X;
 		float wSpace = ImGui.CalcTextSize(" ").X;
 		float edgeRight = ImGui.GetContentRegionAvail().X - style.WindowPadding.X - style.ItemSpacing.X;
 
 		ImGui.TextUnformatted(LblHeader);
 
-		ImGui.SameLine(edgeRight - (wAll + wSpace + wBorderless));
+		ImGui.SameLine(edgeRight - (wAll + wSpace + wFiltered));
 		if (shiftOnlySmallButton(btnAll, tip)) {
-			if (modeEnable) {
-				Plugin.Config.BgmDisabledMounts.Clear();
-			}
-			else {
-				foreach (MountData mount in Plugin.AlphabetisedMounts)
-					Plugin.Config.BgmDisabledMounts.Add(mount.Id);
-			}
+			if (modeEnable)
+				Plugin.Config.EnableAll();
+			else
+				Plugin.Config.DisableAll();
 			Plugin.Config.Save();
 		}
 
 		ImGui.SameLine();
-		if (shiftOnlySmallButton(btnBad, tip)) {
-			foreach (MountData mount in Plugin.AlphabetisedMounts) {
-				if (mount.BgmId == Plugin.BgmIdBorderless) {
-					if (modeEnable)
-						Plugin.Config.BgmDisabledMounts.Remove(mount.Id);
-					else
-						Plugin.Config.BgmDisabledMounts.Add(mount.Id);
-				}
+		if (shiftOnlySmallButton(btnFiltered, tip)) {
+			foreach (MountData mount in Plugin.AlphabetisedMounts.Where(this.displayMountInList)) {
+				if (modeEnable)
+					Plugin.Config.EnableBgm(mount);
+				else
+					Plugin.Config.DisableBgm(mount);
 			}
 			Plugin.Config.Save();
 		}
@@ -158,26 +158,23 @@ public class ConfigWindow: Window {
 			ImGui.EndTooltip();
 		}
 
+		ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X / 2);
+		ImGui.InputTextWithHint("###searchByName", "Filter by name...", ref this.searchTextMountName, 30);
 		ImGui.SameLine();
 		ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X);
-		ImGui.InputTextWithHint("###searchByName", "Filter by name...", ref this.searchText, 20);
+		ImGui.InputTextWithHint("###searchBySong", "Filter by BGM...", ref this.searchTextBgmFilename, 30);
 	}
 
 	private void drawMountList() {
 		ImGuiStylePtr style = ImGui.GetStyle();
 		Vector2 size = new(0);
 		//size.Y -= style.FramePadding.Y;
-		size.Y -= ImGui.GetFrameHeightWithSpacing();
-		bool filterByName = !string.IsNullOrEmpty(this.searchText);
+		size.Y -= ImGui.GetFrameHeightWithSpacing() * 2;
 
 		if (ImGui.BeginChild("mountlist", size, false, ImGuiWindowFlags.AlwaysVerticalScrollbar)) {
-			foreach (MountData mount in Plugin.AlphabetisedMounts) {
-				if (filterByName && !mount.Name.Contains(this.searchText, StringComparison.OrdinalIgnoreCase))
-					continue;
-				if (this.filterOnlyUnlocked && !mount.Unlocked)
-					continue;
+			foreach (MountData mount in Plugin.AlphabetisedMounts.Where(this.displayMountInList)) {
 
-				bool enableBgm = !Plugin.Config.BgmDisabledMounts.Contains(mount.Id);
+				bool enableBgm = Plugin.Config.IsBgmEnabled(mount);
 				if (ImGui.Checkbox($"{mount.Name}###mount{mount.Id}", ref enableBgm)) {
 					if (enableBgm)
 						Plugin.Config.BgmDisabledMounts.Add(mount.Id);
@@ -194,5 +191,22 @@ public class ConfigWindow: Window {
 			}
 		}
 		ImGui.EndChild();
+	}
+
+	[SuppressMessage("Style", "IDE0046:Convert to conditional expression", Justification = "readability pattern")]
+	private bool displayMountInList(MountData mount) {
+
+		if (this.filterOnlyUnlocked && !mount.Unlocked)
+			return false;
+
+		bool filterByName = !string.IsNullOrEmpty(this.searchTextMountName);
+		if (filterByName && !mount.Name.Contains(this.searchTextMountName, StringComparison.OrdinalIgnoreCase))
+			return false;
+
+		bool filterBySong = !string.IsNullOrEmpty(this.searchTextBgmFilename);
+		if (filterBySong && !mount.Bgm.Contains(this.searchTextBgmFilename, StringComparison.OrdinalIgnoreCase))
+			return false;
+
+		return true;
 	}
 }

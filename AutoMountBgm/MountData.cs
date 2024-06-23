@@ -1,12 +1,12 @@
 namespace PrincessRTFM.AutoMountBGM;
 
-internal class MountData {
+public class MountData(ushort id, string name, ushort bgm) {
 	private bool isUnlocked = false;
 	private string bgmName = null!;
 
-	public readonly ushort Id;
-	public readonly ushort BgmId;
-	public readonly string Name;
+	public ushort Id { get; init; } = id;
+	public ushort BgmId { get; init; } = bgm;
+	public string Name { get; init; } = name[..1].ToUpper() + name[1..];
 
 	public string Bgm {
 		get {
@@ -21,11 +21,5 @@ internal class MountData {
 				this.isUnlocked = Plugin.CheckMountUnlocked(this.Id);
 			return this.isUnlocked;
 		}
-	}
-
-	public MountData(ushort id, string name, ushort bgm) {
-		this.Id = id;
-		this.Name = name[..1].ToUpper() + name[1..];
-		this.BgmId = bgm;
 	}
 }

@@ -13,4 +13,18 @@ public class Configuration: IPluginConfiguration {
 	public bool DisableBorderlessBgm = true;
 
 	public void Save() => Plugin.Interface.SavePluginConfig(this);
+
+	public void EnableBgm(ushort mountId) => this.BgmDisabledMounts.Remove(mountId);
+	public void EnableBgm(MountData mount) => this.EnableBgm(mount.Id);
+	public void EnableAll() => this.BgmDisabledMounts.Clear();
+
+	public void DisableBgm(ushort mountId) => this.BgmDisabledMounts.Add(mountId);
+	public void DisableBgm(MountData mount) => this.DisableBgm(mount.Id);
+	public void DisableAll() {
+		foreach (MountData mount in Plugin.AlphabetisedMounts)
+			this.DisableBgm(mount);
+	}
+
+	public bool IsBgmEnabled(ushort mountId) => this.BgmDisabledMounts.Contains(mountId);
+	public bool IsBgmEnabled(MountData mount) => this.IsBgmEnabled(mount.Id);
 }
