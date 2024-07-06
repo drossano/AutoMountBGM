@@ -11,6 +11,8 @@ using Dalamud.IoC;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
 
+using FFXIVClientStructs.FFXIV.Client.Game.Character;
+
 using Lumina.Excel.GeneratedSheets;
 
 using Character = FFXIVClientStructs.FFXIV.Client.Game.Character.Character;
@@ -25,7 +27,7 @@ public class Plugin: IDalamudPlugin {
 	public const string Name = "AutoMountBGM";
 	public static string Command => $"/{Name.ToLower()}";
 
-	[PluginService] public static DalamudPluginInterface Interface { get; private set; } = null!;
+	[PluginService] public static IDalamudPluginInterface Interface { get; private set; } = null!;
 	[PluginService] public static IClientState ClientState { get; private set; } = null!;
 	[PluginService] public static ICommandManager CommandManager { get; private set; } = null!;
 	[PluginService] public static IChatGui ChatGui { get; private set; } = null!;
@@ -107,7 +109,7 @@ public class Plugin: IDalamudPlugin {
 
 	private unsafe ushort mountId {
 		get {
-			GameObject? player = ClientState.LocalPlayer;
+			IGameObject? player = ClientState.LocalPlayer;
 			if (player is null)
 				return 0;
 			Character* native = (Character*)player.Address;
@@ -115,7 +117,7 @@ public class Plugin: IDalamudPlugin {
 				return 0;
 			if (!native->IsMounted()) // just in case
 				return 0;
-			Character.MountContainer? mount = native->Mount;
+			MountContainer? mount = native->Mount;
 			return mount?.MountId ?? 0;
 		}
 	}
@@ -127,6 +129,13 @@ public class Plugin: IDalamudPlugin {
 		if (!value || mount is 0) { // disable mount bgm when unmounting to prevent volume stutters when using a disabled mount
 			GameConfig.Set(SystemConfigOption.SoundChocobo, false);
 			return;
+		}
+
+		if (Config.DisableBorderlessBgm) {
+			if (mountData[mount].BgmId == BgmIdBorderless) {
+				GameConfig.Set(SystemConfigOption.SoundChocobo, false);
+				return;
+			}
 		}
 
 		if ((Config.DisableBorderlessBgm && mountData[mount].BgmId == BgmIdBorderless) || Config.BgmDisabledMounts.Contains(mount))
