@@ -25,6 +25,6 @@ public class Configuration: IPluginConfiguration {
 			this.DisableBgm(mount);
 	}
 
-	public bool IsBgmEnabled(ushort mountId) => this.BgmDisabledMounts.Contains(mountId);
+	public bool IsBgmEnabled(ushort mountId) => !this.BgmDisabledMounts.Contains(mountId);
 	public bool IsBgmEnabled(MountData mount) => this.IsBgmEnabled(mount.Id);
 }
