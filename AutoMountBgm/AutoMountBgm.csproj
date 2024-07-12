@@ -9,8 +9,4 @@
 
 	<Import Project="dalamud.props" />
 
-	<ItemGroup>
-		<PackageReference Include="XivCommon" Version="9.0.0" />
-	</ItemGroup>
-
 </Project>
