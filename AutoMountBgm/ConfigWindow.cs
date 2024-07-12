@@ -177,9 +177,9 @@ public class ConfigWindow: Window {
 				bool enableBgm = Plugin.Config.IsBgmEnabled(mount);
 				if (ImGui.Checkbox($"{mount.Name}###mount{mount.Id}", ref enableBgm)) {
 					if (enableBgm)
-						Plugin.Config.DisableBgm(mount);
-					else
 						Plugin.Config.EnableBgm(mount);
+					else
+						Plugin.Config.DisableBgm(mount);
 					Plugin.Config.Save();
 				}
 
