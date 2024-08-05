@@ -23,6 +23,8 @@ namespace PrincessRTFM.AutoMountBGM;
 
 public class Plugin: IDalamudPlugin {
 	public const ushort BgmIdBorderless = 319;
+	public const ushort BgmIdBorderless = 895;
+
 
 	public const string Name = "AutoMountBGM";
 	public static string Command => $"/{Name.ToLower()}";
