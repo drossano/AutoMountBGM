@@ -23,7 +23,7 @@ namespace PrincessRTFM.AutoMountBGM;
 
 public class Plugin: IDalamudPlugin {
 	public const ushort BgmIdBorderless = 319;
-	public const ushort BgmIdBorderless = 895;
+	public const ushort BgmIdRoadsLessTraveled = 895;
 
 
 	public const string Name = "AutoMountBGM";
@@ -144,6 +144,19 @@ public class Plugin: IDalamudPlugin {
 			GameConfig.Set(SystemConfigOption.SoundChocobo, false);
 		else
 			GameConfig.Set(SystemConfigOption.SoundChocobo, true);
+
+		if (Config.DisableRoadsLessTraveledBgm) {
+			if (mountData[mount].BgmId == BgmIdRoadsLessTraveled) {
+				GameConfig.Set(SystemConfigOption.SoundChocobo, false);
+				return;
+			}
+		}
+
+		if ((Config.DisableRoadsLessTraveledBgm && mountData[mount].BgmId == BgmIdRoadsLessTraveled) || Config.BgmDisabledMounts.Contains(mount))
+			GameConfig.Set(SystemConfigOption.SoundChocobo, false);
+		else
+			GameConfig.Set(SystemConfigOption.SoundChocobo, true);
+
 	}
 
 	private void onCommand(string command, string args) {

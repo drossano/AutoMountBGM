@@ -25,6 +25,14 @@ public class ConfigWindow: Window {
 		}
 	}
 
+	private static string bgmFilenameRoadsLessTraveled = null!;
+	public static string RoadsLessTraveledBgmFile {
+		get {
+			bgmFilenameRoadsLessTraveled ??= Plugin.GetBgmName(Plugin.BgmIdRoadsLessTraveled);
+			return bgmFilenameRoadsLessTraveled;
+		}
+	}
+
 	private bool playerLoggedIn = false;
 	private bool filterOnlyUnlocked = false;
 	private string searchTextMountName = string.Empty;
@@ -85,6 +93,19 @@ public class ConfigWindow: Window {
 				+ $"The track name is {BorderlessBgmFile}, in case you want to look through the list.");
 			ImGui.TextUnformatted("");
 			ImGui.TextUnformatted("If this is enabled, it functions as an override - any time you get on a mount that plays Borderless, mount BGM will be disabled, regardless of that specific mount's setting.");
+			ImGui.PopTextWrapPos();
+			ImGui.EndTooltip();
+		}
+
+		if (ImGui.Checkbox("Always disable mount BGM for mounts playing \"Roads Les Traveled\"", ref Plugin.Config.DisableRoadsLessTraveledBgm))
+			Plugin.Config.Save();
+		if (ImGui.IsItemHovered()) {
+			ImGui.BeginTooltip();
+			ImGui.PushTextWrapPos(550);
+			ImGui.TextUnformatted("This is the really mind-numbing default song for mounts that don't have their own custom track, such as the chocobo."
+				+ $"The track name is {RoadsLessTraveledBgmFile}, in case you want to look through the list.");
+			ImGui.TextUnformatted("");
+			ImGui.TextUnformatted("If this is enabled, it functions as an override - any time you get on a mount that plays Roads Less Traveled, mount BGM will be disabled, regardless of that specific mount's setting.");
 			ImGui.PopTextWrapPos();
 			ImGui.EndTooltip();
 		}

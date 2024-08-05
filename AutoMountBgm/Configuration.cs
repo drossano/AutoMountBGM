@@ -11,6 +11,7 @@ public class Configuration: IPluginConfiguration {
 
 	public HashSet<ushort> BgmDisabledMounts { get; set; } = [];
 	public bool DisableBorderlessBgm = true; // field because it's used `ref` in the config window
+	public bool DisableRoadsLessTraveledBgm = true; // field because it's used `ref` in the config window
 
 	public void Save() => Plugin.Interface.SavePluginConfig(this);
 
